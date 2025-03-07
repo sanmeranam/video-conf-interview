@@ -2,7 +2,9 @@ import React, { use, useEffect, useRef, useState } from "react";
 import io from "socket.io-client";
 import SimplePeer from "simple-peer";
 
-const socket = io("http://localhost:3300");
+// get current host url
+const host = window.location.origin;
+const socket = io(host);
 
 
 const Video = ({ peer }) => {

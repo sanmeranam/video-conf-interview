@@ -22861,7 +22861,8 @@ function requireSimplePeer () {
 var simplePeerExports = requireSimplePeer();
 const SimplePeer = /*@__PURE__*/getDefaultExportFromCjs$1(simplePeerExports);
 
-const socket = lookup("http://localhost:3300");
+const host = window.location.origin;
+const socket = lookup(host);
 const Video = ({ peer }) => {
   const ref = reactExports.useRef();
   reactExports.useEffect(() => {
