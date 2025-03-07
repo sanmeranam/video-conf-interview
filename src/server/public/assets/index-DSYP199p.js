@@ -22890,6 +22890,15 @@ function VideoPage({ roomId = "123" }) {
   }, []);
   reactExports.useEffect(() => {
     if (!turnDetails) return;
+    if (!window.crypto) {
+      window.crypto = {
+        getRandomValues: function(buffer) {
+          for (let i = 0; i < buffer.length; i++) {
+            buffer[i] = Math.floor(Math.random() * 256);
+          }
+        }
+      };
+    }
     const myUserId2 = `user_${Math.floor(Math.random() * 1e12)}`;
     navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((mediaStream) => {
       localMedia.current.srcObject = mediaStream;

@@ -31,7 +31,7 @@ export default function VideoPage({ roomId = "123" }) {
     useEffect(() => {
 
         (async () => {
-            const data = await(await fetch("/api/v1/get-turn")).json();
+            const data = await (await fetch("/api/v1/get-turn")).json();
             setTurnDetails([
                 { urls: "stun:stun.l.google.com:19302" },
                 ...data.iceServers
@@ -41,7 +41,17 @@ export default function VideoPage({ roomId = "123" }) {
     }, []);
 
     useEffect(() => {
-        if(!turnDetails) return;
+        if (!turnDetails) return;
+
+        if (!window.crypto) {
+            window.crypto = {
+                getRandomValues: function (buffer) {
+                    for (let i = 0; i < buffer.length; i++) {
+                        buffer[i] = Math.floor(Math.random() * 256);
+                    }
+                },
+            };
+        }
 
         const myUserId = `user_${Math.floor(Math.random() * 1000000000000)}`;
         navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((mediaStream) => {
