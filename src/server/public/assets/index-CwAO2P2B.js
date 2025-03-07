@@ -22945,6 +22945,7 @@ function VideoPage({ roomId = "123" }) {
       initiator: true,
       trickle: false,
       stream: stream2,
+      debug: true,
       config: {
         iceServers: turnDetails
       }
@@ -22959,6 +22960,7 @@ function VideoPage({ roomId = "123" }) {
       initiator: false,
       trickle: false,
       stream: stream2,
+      debug: true,
       config: {
         iceServers: turnDetails
       }

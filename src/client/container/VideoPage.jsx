@@ -108,6 +108,7 @@ export default function VideoPage({ roomId = "123" }) {
             initiator: true,
             trickle: false,
             stream,
+            debug: true,
             config: {
                 iceServers: turnDetails
             }
@@ -125,6 +126,7 @@ export default function VideoPage({ roomId = "123" }) {
             initiator: false,
             trickle: false,
             stream,
+            debug: true,
             config: {
                 iceServers: turnDetails
             }
