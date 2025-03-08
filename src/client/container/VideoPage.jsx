@@ -1,48 +1,41 @@
 import React, { use, useEffect, useRef, useState } from "react";
 import io from "socket.io-client";
-import SimplePeer from "simple-peer";
+import Peer from "peerjs";
+// import SimplePeer from "simple-peer";
 
 // get current host url
-const host = window.location.origin;
-const socket = io(host);
+const host = window.location.hostname;
+const socket = io();
 
 
 const Video = ({ peer }) => {
     const ref = useRef();
 
     useEffect(() => {
-        peer.on("stream", (stream) => {
-            ref.current.srcObject = stream;
-        });
+        ref.current.srcObject = peer;
     }, [peer]);
 
     return <video ref={ref} autoPlay playsInline />;
 };
 
+
+
 export default function VideoPage({ roomId = "123" }) {
     const localMedia = useRef(null);
-    const [stream, setStream] = useState(null);
-    const [peers, setPeers] = useState([]);
-    const userVideo = useRef();
+    // const [stream, setStream] = useState(null);
+    const [peers, setPeers] = useState({});
+    // const userVideo = useRef();
     const peersRef = useRef([]);
-    const [turnDetails, setTurnDetails] = useState(null);
+    const peer = useRef(null);
+
+
+
+    const getUniqueId = () => {
+        return Math.round(Math.random() * 9999999999).toString(16) + '-' + roomId;
+    };
 
 
     useEffect(() => {
-
-        (async () => {
-            const data = await (await fetch("/api/v1/get-turn")).json();
-            setTurnDetails([
-                { urls: "stun:stun.l.google.com:19302" },
-                ...data.iceServers
-            ]);
-        })();
-
-    }, []);
-
-    useEffect(() => {
-        if (!turnDetails) return;
-
         if (!window.crypto) {
             window.crypto = {
                 getRandomValues: function (buffer) {
@@ -53,103 +46,97 @@ export default function VideoPage({ roomId = "123" }) {
             };
         }
 
-        const myUserId = `user_${Math.floor(Math.random() * 1000000000000)}`;
+        peer.current = new Peer(getUniqueId(), {
+            host: 'call.tefiti.in',
+            port: 443,
+            secure: true,
+            path: "/server",
+            debug: 0,
+            config: {
+                iceServers: [
+                    { urls: "stun:stun.l.google.com:19302" },
+                    {
+                        url: "stun:global.stun.twilio.com:3478",
+                        urls: "stun:global.stun.twilio.com:3478",
+                    },
+                    {
+                        credential: "/UceUpkEPt6rYGr60FflURk/IQvsoPE3Md9hO8HUaTQ=",
+                        url: "turn:global.turn.twilio.com:3478?transport=udp",
+                        urls: "turn:global.turn.twilio.com:3478?transport=udp",
+                        username: "c67a793741df219bb9134d75e5af87b0baff32a6d72da8fdaf491d38858c10ca",
+                    },
+                    {
+                        credential: "/UceUpkEPt6rYGr60FflURk/IQvsoPE3Md9hO8HUaTQ=",
+                        url: "turn:global.turn.twilio.com:3478?transport=tcp",
+                        urls: "turn:global.turn.twilio.com:3478?transport=tcp",
+                        username: "c67a793741df219bb9134d75e5af87b0baff32a6d72da8fdaf491d38858c10ca",
+                    },
+                    {
+                        credential: "/UceUpkEPt6rYGr60FflURk/IQvsoPE3Md9hO8HUaTQ=",
+                        url: "turn:global.turn.twilio.com:443?transport=tcp",
+                        urls: "turn:global.turn.twilio.com:443?transport=tcp",
+                        username: "c67a793741df219bb9134d75e5af87b0baff32a6d72da8fdaf491d38858c10ca",
+                    },
+                ]
+            }
+        });
+
+        peer.current.socket.send({
+            type: "join-room",
+            roomId: roomId,
+            userId: peer.current.id,
+        });
+
         navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((mediaStream) => {
             localMedia.current.srcObject = mediaStream;
-            setStream(mediaStream);
+            socket.emit("join-room", roomId, peer.current.id);
 
-            socket.emit("join-room", roomId, myUserId);
+            peer.current.on("call", (call) => {
+                call.answer(mediaStream);
+                call.on("stream", (stream) => {
+                    const _peers = { ...peers };
+                    _peers[call.peer] = stream;
+                    setPeers(_peers);
+                });
+            });
 
             socket.on("user-connected", (userId) => {
-                const peer = createPeer(userId, myUserId, mediaStream);
-                peersRef.current.push({ peerID: userId, peer });
-                setPeers((users) => [...users, peer]);
-            });
-
-            socket.on("offer", (data) => {
-                const peer = addPeer(data, mediaStream);
-                peersRef.current.push({ peerID: data.from, peer });
-                setPeers((users) => [...users, peer]);
-            });
-
-            socket.on("answer", (data) => {
-                const peer = peersRef.current.find((p) => p.peerID === data.from);
-                if (peer) peer.peer.signal(data.signal);
-            });
-
-            socket.on("ice-candidate", (data) => {
-                const peer = peersRef.current.find((p) => p.peerID === data.from);
-                if (peer) peer.peer.signal(data.candidate);
+                if (userId === peer.current.id) return;
+                const call = peer.current.call(userId, mediaStream);
+                call.on("stream", (userStream) => {
+                    const _peers = { ...peers };
+                    _peers[userId] = userStream;
+                    setPeers(_peers);
+                });
+                call.on("close", () => {
+                    const _peers = { ...peers };
+                    delete _peers[userId];
+                    setPeers(_peers);
+                });
             });
 
             socket.on("user-disconnected", (userId) => {
-                const peerObj = peersRef.current.find((p) => p.peerID === userId);
-                if (peerObj) {
-                    peerObj.peer.destroy();
-                    setPeers((users) => users.filter((p) => p !== peerObj.peer));
-                }
+                const _peers = { ...peers };
+                delete _peers[userId];
+                setPeers(_peers);
             });
         }).catch((err) => {
             console.log(err);
         });
 
         return () => {
-            socket.off("user-connected");
-            socket.off("offer");
-            socket.off("answer");
-            socket.off("ice-candidate");
-            socket.off("user-disconnected");
+            peer.current.destroy();
         };
-    }, [roomId, turnDetails]);
-
-
-    function createPeer(userToSignal, callerID, stream) {
-        const peer = new SimplePeer({
-            initiator: true,
-            trickle: false,
-            stream,
-            debug: true,
-            config: {
-                iceServers: turnDetails
-            }
-        });
-
-        peer.on("signal", (signal) => {
-            socket.emit("offer", { signal, from: callerID, to: userToSignal, roomId });
-        });
-
-        return peer;
-    }
-
-    function addPeer(incomingData, stream) {
-        const peer = new SimplePeer({
-            initiator: false,
-            trickle: false,
-            stream,
-            debug: true,
-            config: {
-                iceServers: turnDetails
-            }
-        });
-
-        peer.on("signal", (signal) => {
-            socket.emit("answer", { signal, from: myUserId, to: incomingData.from, roomId });
-        });
-
-        peer.signal(incomingData.signal);
-        return peer;
-    }
+    }, [roomId]);
 
 
     return (
         <div>
             <h2>Video Conference</h2>
             <video ref={localMedia} autoPlay playsInline></video>
-            {/* <button onClick={startStreaming}>Start Streaming</button> */}
-
             <h3>Remote Video</h3>
-            {peers.map((peer, index) => (
-                <Video key={index} peer={peer} />
+            {Object.entries(peers).map(([key, value]) => (
+                <Video key={key} peer={value} />
             ))}
         </div>
     );

@@ -58,9 +58,15 @@ export default defineConfig({
         target: `http://localhost:${process.env.PORT}`,
         changeOrigin: true,
       },
-      [process.env.VITE_REPORT_API_URL]: {
+      '/socket.io': {
         target: `http://localhost:${process.env.PORT}`,
         changeOrigin: true,
+        ws: true,
+      },
+      '/call-server': {
+        target: `ws://localhost:${process.env.PORT}`,
+        changeOrigin: true,
+        ws: true,
       },
     },
   },
